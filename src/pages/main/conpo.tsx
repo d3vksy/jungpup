@@ -30,7 +30,6 @@ export const ClockSimulator = () => {
     const {
         setTrack,
         play,
-        resume,
         pause,
         stop,
         setVolume,
