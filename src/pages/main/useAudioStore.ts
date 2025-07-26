@@ -301,7 +301,7 @@ export const useAudioStore = create<AudioStore>((set, get) => ({
         if (audioContext && sourceNode && spatialEnabled) {
             // 현재 재생 중인 오디오를 다시 시작하여 새로운 위치 적용
             const currentTime = get().currentTime;
-            const { audioBuffer, volume } = get();
+            const { audioBuffer, volume, spatialEffects } = get();
 
             if (audioBuffer) {
                 // 기존 오디오 정리
@@ -333,7 +333,56 @@ export const useAudioStore = create<AudioStore>((set, get) => ({
 
                     newSource.connect(panner);
                     panner.connect(gain);
-                    gain.connect(audioContext.destination);
+
+                    // Delay
+                    const delayTime = 0.001;
+                    const delayNode = audioContext.createDelay(delayTime);
+                    const delayFeedbackNode = audioContext.createGain();
+                    const delayDry = audioContext.createGain();
+                    const delayWet = audioContext.createGain();
+                    delayNode.connect(delayFeedbackNode);
+                    delayFeedbackNode.connect(delayNode);
+                    delayFeedbackNode.gain.value = spatialEffects.delayFeedback;
+                    gain.connect(delayDry);
+                    delayDry.connect(audioContext.destination);
+                    delayDry.gain.value = 1 - spatialEffects.delayMix;
+                    gain.connect(delayNode);
+                    delayNode.connect(delayWet);
+                    delayWet.connect(audioContext.destination);
+                    delayWet.gain.value = spatialEffects.delayMix;
+
+                    // Reverb
+                    const reverbTime = 0.25;
+                    const reverbDecay = 0.1;
+                    const convolver = audioContext.createConvolver();
+                    const sampleRate = audioContext.sampleRate;
+                    const length = sampleRate * reverbTime;
+                    const impulse = audioContext.createBuffer(2, length, sampleRate);
+                    for (let i = 0; i < length; i++) {
+                        const decay = Math.pow(1 - i / length, reverbDecay);
+                        impulse.getChannelData(0)[i] = (Math.random() * 2 - 1) * decay;
+                        impulse.getChannelData(1)[i] = (Math.random() * 2 - 1) * decay;
+                    }
+                    convolver.buffer = impulse;
+                    const reverbDry = audioContext.createGain();
+                    const reverbWet = audioContext.createGain();
+                    delayWet.connect(reverbDry);
+                    reverbDry.connect(audioContext.destination);
+                    reverbDry.gain.value = 1 - spatialEffects.reverbMix;
+                    delayWet.connect(convolver);
+                    convolver.connect(reverbWet);
+                    reverbWet.connect(audioContext.destination);
+                    reverbWet.gain.value = spatialEffects.reverbMix;
+
+                    // Compressor
+                    const compressor = audioContext.createDynamicsCompressor();
+                    compressor.threshold.setValueAtTime(spatialEffects.compressorThreshold, audioContext.currentTime);
+                    compressor.knee.setValueAtTime(30, audioContext.currentTime);
+                    compressor.ratio.setValueAtTime(12, audioContext.currentTime);
+                    compressor.attack.setValueAtTime(0.003, audioContext.currentTime);
+                    compressor.release.setValueAtTime(0.25, audioContext.currentTime);
+                    gain.connect(compressor);
+                    compressor.connect(audioContext.destination);
                 } else {
                     newSource.connect(gain);
                     gain.connect(audioContext.destination);
@@ -554,6 +603,7 @@ export const useAudioStore = create<AudioStore>((set, get) => ({
                     sourceNode: null,
                     playbackInterval: null,
                     startOffset: 0,
+                    currentTime: 0,
                 });
             }
         }, 100);
@@ -565,6 +615,7 @@ export const useAudioStore = create<AudioStore>((set, get) => ({
                 sourceNode: null,
                 playbackInterval: null,
                 startOffset: 0,
+                currentTime: 0,
             });
         };
 
@@ -572,8 +623,14 @@ export const useAudioStore = create<AudioStore>((set, get) => ({
     },
 
     resume: () => {
-        const { audioContext, audioBuffer, isPlaying, startOffset, spatialEnabled, volume, speakerPosition, spatialEffects } = get();
+        const { audioContext, audioBuffer, isPlaying, startOffset, spatialEnabled, volume, speakerPosition, spatialEffects, duration } = get();
         if (!audioContext || !audioBuffer || isPlaying) return;
+
+        // 방송이 이미 끝났으면 재생하지 않음
+        if (startOffset >= (duration || 0)) {
+            console.log('방송이 이미 끝났습니다. 재생하지 않습니다.');
+            return;
+        }
 
         const source = audioContext.createBufferSource();
         source.buffer = audioBuffer;

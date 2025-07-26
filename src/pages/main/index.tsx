@@ -26,7 +26,7 @@ function getDDay(targetDateStr: string): string {
 
 const MainPage = () => {
     return (
-        <ThemeProvider>
+        <ThemeProvider defaultTheme="dark">
             <div style={{ margin: "10px", borderBottom: "1.7px solid #404040", padding: "5px" }} className="flex items-center">
                 <div style={{ marginRight: "auto" }}>
                     <h1 style={{ fontSize: "1.2em", fontWeight: "600" }}>대학수학능력시험 시뮬레이터</h1>

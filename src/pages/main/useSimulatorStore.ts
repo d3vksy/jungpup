@@ -4,6 +4,7 @@ import { create } from 'zustand';
 interface Event {
     time: string; // "HH:MM:SS"
     action: () => void;
+    executed?: boolean; // 실행 여부 추적
 }
 
 interface SimulatorStore {
@@ -49,10 +50,17 @@ export const useSimulatorStore = create<SimulatorStore>((set, get) => ({
         const tick = () => {
             set((state) => {
                 const nowStr = state.currentTime.toTimeString().slice(0, 8);
-                // 실행 후 배열에서 제거
-                const toFire = state.events.filter((e) => e.time === nowStr);
-                toFire.forEach((e) => e.action());
-                const remaining = state.events.filter((e) => e.time !== nowStr);
+                // 실행되지 않은 이벤트만 실행
+                const toFire = state.events.filter((e) => e.time === nowStr && !e.executed);
+                if (toFire.length > 0) {
+                    console.log(`🔔 startSimulation 이벤트 실행: ${nowStr}, 개수: ${toFire.length}`);
+                }
+                toFire.forEach((e) => {
+                    console.log(`🎵 이벤트 실행: ${e.time}`);
+                    e.action();
+                    e.executed = true; // 실행 표시
+                });
+                const remaining = state.events.filter((e) => e.time !== nowStr || !e.executed);
                 // 시간 진행
                 const nextTime = new Date(state.currentTime.getTime() + 1000 * state.speed);
                 return {
@@ -80,23 +88,27 @@ export const useSimulatorStore = create<SimulatorStore>((set, get) => ({
     resumeSimulation: () => {
         if (get().timerId != null) return;
 
-
-        // 즉시 실행하지 않고 타이머만 시작
+        // 즉시 실행하지 않고 타이머만 시작 (즉시 실행 제거)
         const id = window.setInterval(() => {
-            const tick = () => {
-                set((state) => {
-                    const nowStr = state.currentTime.toTimeString().slice(0, 8);
-                    const toFire = state.events.filter((e) => e.time === nowStr);
-                    toFire.forEach((e) => e.action());
-                    const remaining = state.events.filter((e) => e.time !== nowStr);
-                    const nextTime = new Date(state.currentTime.getTime() + 1000 * state.speed);
-                    return {
-                        currentTime: nextTime,
-                        events: remaining,
-                    };
+            set((state) => {
+                const nowStr = state.currentTime.toTimeString().slice(0, 8);
+                // 실행되지 않은 이벤트만 실행
+                const toFire = state.events.filter((e) => e.time === nowStr && !e.executed);
+                if (toFire.length > 0) {
+                    console.log(`🔔 resumeSimulation 이벤트 실행: ${nowStr}, 개수: ${toFire.length}`);
+                }
+                toFire.forEach((e) => {
+                    console.log(`🎵 이벤트 실행: ${e.time}`);
+                    e.action();
+                    e.executed = true; // 실행 표시
                 });
-            };
-            tick();
+                const remaining = state.events.filter((e) => e.time !== nowStr || !e.executed);
+                const nextTime = new Date(state.currentTime.getTime() + 1000 * state.speed);
+                return {
+                    currentTime: nextTime,
+                    events: remaining,
+                };
+            });
         }, 1000);
         set({ timerId: id, isRunning: true });
     },
@@ -117,9 +129,17 @@ export const useSimulatorStore = create<SimulatorStore>((set, get) => ({
             const tick = () => {
                 set((state) => {
                     const nowStr = state.currentTime.toTimeString().slice(0, 8);
-                    const toFire = state.events.filter((e) => e.time === nowStr);
-                    toFire.forEach((e) => e.action());
-                    const remaining = state.events.filter((e) => e.time !== nowStr);
+                    // 실행되지 않은 이벤트만 실행
+                    const toFire = state.events.filter((e) => e.time === nowStr && !e.executed);
+                    if (toFire.length > 0) {
+                        console.log(`🔔 setSpeed 이벤트 실행: ${nowStr}, 개수: ${toFire.length}`);
+                    }
+                    toFire.forEach((e) => {
+                        console.log(`🎵 이벤트 실행: ${e.time}`);
+                        e.action();
+                        e.executed = true; // 실행 표시
+                    });
+                    const remaining = state.events.filter((e) => e.time !== nowStr || !e.executed);
                     const nextTime = new Date(state.currentTime.getTime() + 1000 * state.speed);
                     return {
                         currentTime: nextTime,

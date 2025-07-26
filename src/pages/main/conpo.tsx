@@ -1,5 +1,5 @@
 // src/components/ClockSimulator.tsx
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { Progress } from '@/components/ui/progress';
@@ -220,8 +220,8 @@ export const ClockSimulator = () => {
         setShowListeningWarning(true); // 초기 경고 표시
     }, []);
 
-    // 이벤트 등록 함수
-    const registerAllEvents = () => {
+    // 이벤트 등록 함수 - useCallback으로 메모이제이션
+    const registerAllEvents = useCallback(() => {
         const subtractTime = (time: string, minutes: number): string => {
             const [h, m, s] = time.split(':').map(Number);
             let totalMinutes = h * 60 + m - minutes;
@@ -379,12 +379,12 @@ export const ClockSimulator = () => {
                 }
             }
         });
-    };
+    }, [registerEvent, setTrack, play, listeningAudioUrl]); // useCallback 의존성 배열 추가
 
     // 이벤트 등록을 위한 useEffect
     useEffect(() => {
         registerAllEvents();
-    }, [registerEvent, setTrack, play, listeningAudioUrl]);
+    }, [registerAllEvents]); // registerAllEvents만 의존성으로 설정
 
     const formattedTime = currentTime.toTimeString().slice(0, 8);
 
@@ -455,7 +455,7 @@ export const ClockSimulator = () => {
             } else if (!isRunning) {
                 // 일시정지된 상태 - 재개
                 resumeSimulation();
-                resume(); // 일시정지된 오디오를 정확한 위치에서 재개
+                // resume() 호출 제거 - 오디오는 시뮬레이션과 독립적으로 관리
             } else {
                 // 실행 중인 상태 - 일시정지
                 pauseSimulation();
